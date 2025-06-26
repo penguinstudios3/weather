@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WeatherBot AI</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #e0f7fa;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #chatbox {
+      width: 100%;
+      max-width: 500px;
+      background: white;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      overflow-y: auto;
+      height: 400px;
+      margin-bottom: 1rem;
+    }
+    .msg {
+      margin-bottom: 1rem;
+    }
+    .user { text-align: right; }
+    .bot { text-align: left; color: #00796b; }
+    #inputForm {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+      max-width: 500px;
+    }
+    #userInput {
+      flex-grow: 1;
+      padding: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌦️ WeatherBot</h1>
+  <div id="chatbox"></div>
+  <form id="inputForm">
+    <input type="text" id="userInput" placeholder="Enter a city (e.g. Tokyo)" required />
+    <button type="submit">Ask</button>
+  </form>
+
+  <script>
+    const chatbox = document.getElementById('chatbox');
+    const inputForm = document.getElementById('inputForm');
+    const userInput = document.getElementById('userInput');
+
+    const WEATHER_API_KEY = '57d1da3aa001e576f4e5fb9daca612c7'; // Your OpenWeatherMap key
+
+    function addMessage(msg, sender = 'user') {
+      const div = document.createElement('div');
+      div.className = `msg ${sender}`;
+      div.textContent = msg;
+      chatbox.appendChild(div);
+      chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    async function getWeatherFromOpenWeather(city) {
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${WEATHER_API_KEY}&units=metric`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return `⚠️ I couldn't find weather for "${city}".`;
+
+        const data = await res.json();
+        const temp = data.main.temp;
+        const desc = data.weather[0].description;
+        const feels = data.main.feels_like;
+        const humidity = data.main.humidity;
+        const wind = data.wind.speed;
+
+        return `🌤️ The weather in ${city} is ${desc}, ${temp}°C (feels like ${feels}°C), humidity: ${humidity}%, wind: ${wind} m/s.`;
+      } catch (err) {
+        return "⚠️ Error getting weather data.";
+      }
+    }
+
+    inputForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const city = userInput.value.trim();
+      if (!city) return;
+      addMessage(city, 'user');
+      userInput.value = '';
+      addMessage("Checking weather...", 'bot');
+
+      const reply = await getWeatherFromOpenWeather(city);
+      addMessage(reply, 'bot');
+    });
+  </script>
+</body>
+</html>
