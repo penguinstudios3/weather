@@ -696,10 +696,14 @@
       <div class="welcome-message">
         <i class="fas fa-robot"></i>
         Welcome to WeatherBot AI with live global weather feed!<br>
-        Watch real-time weather updates from major cities above, then ask me about any location:<br><br>
+        I'm detecting your location to show local weather, then you can ask about anywhere:<br><br>
         <strong>"What's the weather in Tokyo?"</strong><br>
         <strong>"Is it raining in London?"</strong><br>
-        <strong>"How's the weather in New York today?"</strong>
+        <strong>"How's the weather in New York today?"</strong><br><br>
+        <div style="padding: 0.75rem; background: rgba(116, 185, 255, 0.1); border-left: 3px solid #74b9ff; border-radius: 8px; font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: 1rem;">
+          <i class="fas fa-shield-alt" style="margin-right: 0.5rem;"></i>
+          <strong>Privacy:</strong> Location detection uses your IP address and data stays in your browser.
+        </div>
       </div>
     </div>
     
@@ -786,7 +790,7 @@
             <div class="weather-item-city">${weatherData.city}, ${weatherData.country}</div>
             <div class="weather-item-desc">${weatherData.description}</div>
           </div>
-          <div class="weather-item-temp">${weatherData.temp}°C</div>
+          <div class="weather-item-temp">${weatherData.temp}°F <small style="opacity: 0.7; font-size: 0.8em;">(${Math.round((weatherData.temp - 32) * 5/9)}°C)</small></div>
         </div>
       `;
     }
@@ -890,7 +894,7 @@
     // Fetch weather data for a city
     async function fetchCityWeather(city) {
       try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${WEATHER_API_KEY}&units=metric`;
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${WEATHER_API_KEY}&units=imperial`;
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -1080,13 +1084,13 @@
             </div>
             <div style="text-align: right;">
               <i class="${weatherIcon} weather-icon"></i>
-              <div class="weather-temp">${Math.round(data.temp)}°C</div>
+              <div class="weather-temp">${Math.round(data.temp)}°F<br><small style="opacity: 0.7; font-size: 0.7em;">(${Math.round((data.temp - 32) * 5/9)}°C)</small></div>
             </div>
           </div>
           <div class="weather-details">
             <div class="weather-detail">
               <i class="fas fa-thermometer-half"></i>
-              <span>Feels like ${Math.round(data.feels_like)}°C</span>
+              <span>Feels like ${Math.round(data.feels_like)}°F <small style="opacity: 0.7;">(${Math.round((data.feels_like - 32) * 5/9)}°C)</small></span>
             </div>
             <div class="weather-detail">
               <i class="fas fa-tint"></i>
@@ -1094,7 +1098,7 @@
             </div>
             <div class="weather-detail">
               <i class="fas fa-wind"></i>
-              <span>Wind ${data.wind_speed} m/s</span>
+              <span>Wind ${data.wind_speed} mph</span>
             </div>
             <div class="weather-detail">
               <i class="fas fa-eye"></i>
@@ -1152,6 +1156,181 @@
 
     // Weather data cache for learn more functionality
     const weatherDataCache = new Map();
+
+    // IP-based location detection
+    async function getCurrentLocationFromIP() {
+      try {
+        console.log('🌍 Detecting location from IP address...');
+        
+        // Try multiple IP geolocation services for better reliability
+        const services = [
+          {
+            name: 'ipapi.co',
+            url: 'https://ipapi.co/json/',
+            parser: (data) => ({
+              city: data.city,
+              country: data.country_name,
+              lat: data.latitude,
+              lon: data.longitude,
+              region: data.region
+            })
+          },
+          {
+            name: 'ipinfo.io',
+            url: 'https://ipinfo.io/json',
+            parser: (data) => {
+              const [lat, lon] = (data.loc || '0,0').split(',');
+              return {
+                city: data.city,
+                country: data.country,
+                lat: parseFloat(lat),
+                lon: parseFloat(lon),
+                region: data.region
+              };
+            }
+          },
+          {
+            name: 'ip-api.com',
+            url: 'http://ip-api.com/json/',
+            parser: (data) => ({
+              city: data.city,
+              country: data.country,
+              lat: data.lat,
+              lon: data.lon,
+              region: data.regionName
+            })
+          }
+        ];
+
+        // Try services in order until one succeeds
+        for (const service of services) {
+          try {
+            console.log(`Trying ${service.name}...`);
+            const response = await fetch(service.url);
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            const location = service.parser(data);
+            
+            if (location.city && location.lat && location.lon) {
+              console.log(`✅ Location detected via ${service.name}:`, location);
+              return location;
+            } else {
+              throw new Error('Incomplete location data');
+            }
+          } catch (error) {
+            console.warn(`❌ ${service.name} failed:`, error.message);
+            continue;
+          }
+        }
+        
+        throw new Error('All geolocation services failed');
+        
+      } catch (error) {
+        console.error('Failed to detect location:', error);
+        return null;
+      }
+    }
+
+    // Get weather for detected location
+    async function getLocationWeather(location) {
+      try {
+        // Try by coordinates first (most accurate)
+        if (location.lat && location.lon) {
+          const coordUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${location.lat}&lon=${location.lon}&appid=${WEATHER_API_KEY}&units=imperial`;
+          
+          try {
+            const response = await fetch(coordUrl);
+            if (response.ok) {
+              const data = await response.json();
+              return {
+                city: data.name + (data.sys.country ? `, ${data.sys.country}` : ''),
+                temp: data.main.temp,
+                feels_like: data.main.feels_like,
+                description: data.weather[0].description,
+                humidity: data.main.humidity,
+                wind_speed: data.wind.speed,
+                visibility: data.visibility || 10000,
+                lat: data.coord.lat,
+                lon: data.coord.lon,
+                detectedLocation: true,
+                originalLocation: location
+              };
+            }
+          } catch (coordError) {
+            console.warn('Coordinate-based weather failed, trying city name...');
+          }
+        }
+        
+        // Fallback to city name
+        if (location.city) {
+          return await getWeatherData(location.city);
+        }
+        
+        throw new Error('No usable location data');
+        
+      } catch (error) {
+        console.error('Failed to get location weather:', error);
+        throw error;
+      }
+    }
+
+    // Initialize location-based weather on page load
+    async function initializeLocationWeather() {
+      try {
+        const location = await getCurrentLocationFromIP();
+        
+        if (!location) {
+          console.log('Could not detect location, skipping auto-weather');
+          return;
+        }
+        
+        // Show loading message
+        const loadingMsg = addLoadingMessage();
+        loadingMsg.innerHTML = `
+          <i class="fas fa-map-marker-alt"></i>
+          <span>Loading weather for your location (${location.city || 'detected area'})...</span>
+          <div class="typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+        `;
+        
+        // Get weather for the detected location
+        const weatherData = await getLocationWeather(location);
+        loadingMsg.remove();
+        
+        // Show location detection message
+        const locationMessage = location.city && location.country ? 
+          `I detected you're in ${location.city}, ${location.country}. Here's your local weather:` :
+          `I detected your approximate location. Here's your local weather:`;
+        
+        addMessage(locationMessage, 'bot');
+        addMessage(weatherData, 'bot', true);
+        
+        console.log('✅ Successfully loaded location-based weather');
+        
+      } catch (error) {
+        console.error('Location weather initialization failed:', error);
+        
+        // Show helpful message if location detection fails
+        const fallbackMessage = `I couldn't detect your location, but I can still help! Try asking about weather in popular cities like New York, London, Tokyo, or Paris.`;
+        addMessage(fallbackMessage, 'bot');
+        
+        // Update welcome message to remove location detection reference
+        const welcomeMsg = chatContainer.querySelector('.welcome-message');
+        if (welcomeMsg) {
+          const loadingStatus = welcomeMsg.querySelector('.loading-status');
+          if (loadingStatus) {
+            loadingStatus.remove();
+          }
+        }
+      }
+    }
 
     // Enhanced typo correction database
     const cityCorrections = {
@@ -1563,7 +1742,7 @@
       const correctedCity = correction.corrected;
       
       const tryCity = async (cityName) => {
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${WEATHER_API_KEY}&units=metric`;
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${WEATHER_API_KEY}&units=imperial`;
         
         const response = await fetch(url);
         if (!response.ok) {
@@ -1637,7 +1816,7 @@
     // Get 5-day forecast data
     async function getForecastData(city) {
       try {
-        const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${WEATHER_API_KEY}&units=metric`;
+        const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${WEATHER_API_KEY}&units=imperial`;
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -1675,13 +1854,13 @@
         
         return dailyForecasts;
       } catch (error) {
-        // Return mock data if API fails
+        // Return mock data if API fails (Fahrenheit)
         return [
-          { date: 'Today', temp_max: 22, temp_min: 15, description: 'partly cloudy' },
-          { date: 'Tomorrow', temp_max: 24, temp_min: 16, description: 'sunny' },
-          { date: 'Wed', temp_max: 20, temp_min: 12, description: 'light rain' },
-          { date: 'Thu', temp_max: 25, temp_min: 18, description: 'clear sky' },
-          { date: 'Fri', temp_max: 23, temp_min: 17, description: 'few clouds' }
+          { date: 'Today', temp_max: 72, temp_min: 59, description: 'partly cloudy' },
+          { date: 'Tomorrow', temp_max: 75, temp_min: 61, description: 'sunny' },
+          { date: 'Wed', temp_max: 68, temp_min: 54, description: 'light rain' },
+          { date: 'Thu', temp_max: 77, temp_min: 64, description: 'clear sky' },
+          { date: 'Fri', temp_max: 73, temp_min: 63, description: 'few clouds' }
         ];
       }
     }
@@ -1695,13 +1874,13 @@
         // Simulate API call delay
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Generate realistic historical data
-        const baseTemp = 20; // Base temperature
-        const variation = 5; // Temperature variation
+        // Generate realistic historical data (Fahrenheit)
+        const baseTemp = 68; // Base temperature (68°F = 20°C)
+        const variation = 9; // Temperature variation (9°F = 5°C)
         
         const historicalData = {
-          avgHigh: Math.round(baseTemp + variation + (Math.random() * 4 - 2)),
-          avgLow: Math.round(baseTemp - variation + (Math.random() * 4 - 2)),
+          avgHigh: Math.round(baseTemp + variation + (Math.random() * 7 - 3.5)), // Random ±3.5°F
+          avgLow: Math.round(baseTemp - variation + (Math.random() * 7 - 3.5)), // Random ±3.5°F
           totalRain: Math.round(Math.random() * 15), // 0-15mm rainfall
           avgHumidity: Math.round(60 + (Math.random() * 20 - 10)) // 50-70% humidity
         };
@@ -1709,8 +1888,8 @@
         return historicalData;
       } catch (error) {
         return {
-          avgHigh: 22,
-          avgLow: 15,
+          avgHigh: 72,  // 72°F = 22°C
+          avgLow: 59,   // 59°F = 15°C
           totalRain: 5,
           avgHumidity: 65
         };
@@ -1721,12 +1900,12 @@
     function generateWeatherInsights(cityName, forecastData, historicalData) {
       const insights = [];
       
-      // Temperature trend analysis
+      // Temperature trend analysis (Fahrenheit)
       if (forecastData.length >= 2) {
         const tempTrend = forecastData[1].temp_max - forecastData[0].temp_max;
-        if (tempTrend > 3) {
+        if (tempTrend > 5) {  // 5°F change is significant
           insights.push("📈 Temperatures are expected to rise significantly over the next few days.");
-        } else if (tempTrend < -3) {
+        } else if (tempTrend < -5) {  // 5°F change is significant
           insights.push("📉 A cooling trend is expected in the coming days.");
         } else {
           insights.push("🌡️ Temperatures are expected to remain relatively stable.");
@@ -1746,11 +1925,11 @@
         insights.push("☀️ Mostly dry conditions expected - great for outdoor activities!");
       }
       
-      // Historical comparison
-      const currentTemp = forecastData[0]?.temp_max || 20;
-      if (currentTemp > historicalData.avgHigh + 5) {
+      // Historical comparison (Fahrenheit)
+      const currentTemp = forecastData[0]?.temp_max || 68;  // Default 68°F
+      if (currentTemp > historicalData.avgHigh + 9) {  // 9°F = 5°C difference
         insights.push("🔥 Current temperatures are significantly above the recent average.");
-      } else if (currentTemp < historicalData.avgLow - 5) {
+      } else if (currentTemp < historicalData.avgLow - 9) {  // 9°F = 5°C difference
         insights.push("❄️ Temperatures are notably cooler than usual for this time.");
       }
       
@@ -1768,21 +1947,21 @@
     function checkWeatherWarnings(data) {
       const warnings = [];
       
-      // Temperature warnings
-      if (data.temp <= -10) {
+      // Temperature warnings (Fahrenheit)
+      if (data.temp <= 14) {  // 14°F = -10°C
         warnings.push({
           title: "Extreme Cold Warning",
           message: "Temperatures are dangerously low. Dress warmly and limit outdoor exposure."
         });
-      } else if (data.temp >= 35) {
+      } else if (data.temp >= 95) {  // 95°F = 35°C
         warnings.push({
           title: "Heat Warning",
           message: "High temperatures detected. Stay hydrated and avoid prolonged sun exposure."
         });
       }
       
-      // Wind warnings
-      if (data.wind_speed >= 15) {
+      // Wind warnings (mph)
+      if (data.wind_speed >= 34) {  // 34 mph ≈ 15 m/s
         warnings.push({
           title: "High Wind Warning",
           message: "Strong winds may affect travel and outdoor activities. Exercise caution."
@@ -1847,7 +2026,7 @@
                     <div class="forecast-item">
                       <div class="forecast-time">${day.date}</div>
                       <i class="${getWeatherIcon(day.description)} forecast-icon"></i>
-                      <div class="forecast-temp">${Math.round(day.temp_max)}°/${Math.round(day.temp_min)}°</div>
+                                             <div class="forecast-temp">${Math.round(day.temp_max)}°F/${Math.round(day.temp_min)}°F<br><small style="opacity: 0.7; font-size: 0.75em;">(${Math.round((day.temp_max - 32) * 5/9)}°C/${Math.round((day.temp_min - 32) * 5/9)}°C)</small></div>
                       <div style="font-size: 0.8rem; opacity: 0.8;">${day.description}</div>
                     </div>
                   `).join('')}
@@ -1860,11 +2039,11 @@
                 <div class="weather-data-grid">
                   <div class="weather-data-item">
                     <div class="weather-data-label">Avg High</div>
-                    <div class="weather-data-value">${historicalData.avgHigh}°C</div>
+                                         <div class="weather-data-value">${historicalData.avgHigh}°F <small style="opacity: 0.7;">(${Math.round((historicalData.avgHigh - 32) * 5/9)}°C)</small></div>
                   </div>
                   <div class="weather-data-item">
                     <div class="weather-data-label">Avg Low</div>
-                    <div class="weather-data-value">${historicalData.avgLow}°C</div>
+                                         <div class="weather-data-value">${historicalData.avgLow}°F <small style="opacity: 0.7;">(${Math.round((historicalData.avgLow - 32) * 5/9)}°C)</small></div>
                   </div>
                   <div class="weather-data-item">
                     <div class="weather-data-label">Total Rainfall</div>
@@ -1989,13 +2168,25 @@
     // Initialize everything immediately
     console.log('🚀 Initializing WeatherBot AI...');
     
-    // Initialize ticker immediately with sample data
+    // Initialize ticker immediately with loading placeholders
     initializeTicker();
     
-    // Start loading real data immediately
-    setTimeout(() => {
-      loadRealWeatherData();
-    }, 1000);
+    // Start location detection and weather loading in parallel
+    Promise.all([
+      // Load user's location weather
+      initializeLocationWeather(),
+      
+      // Load live ticker data
+      new Promise(resolve => {
+        setTimeout(() => {
+          loadRealWeatherData().then(resolve);
+        }, 1000);
+      })
+    ]).then(() => {
+      console.log('🌟 Weather app fully initialized with location and live data');
+    }).catch(error => {
+      console.warn('Some initialization features failed:', error);
+    });
     
     // Set up automatic data refresh every 15 minutes
     setInterval(() => {
@@ -2007,7 +2198,7 @@
       refreshWeatherData();
     }, 5 * 60 * 1000);
     
-    console.log('🌟 Weather app initialized - live data loading...');
+    console.log('🌟 Weather app initialized - loading location and live data...');
   </script>
 </body>
 </html> 
