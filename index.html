@@ -3,19 +3,830 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Weather Chatbot</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>WeatherBot AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="white" opacity="0.05"/><circle cx="80" cy="40" r="1" fill="white" opacity="0.03"/><circle cx="40" cy="80" r="1" fill="white" opacity="0.07"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 450px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem 1.5rem 1.5rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    }
+
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .header p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+
+    .chat-container {
+      height: 400px;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      scroll-behavior: smooth;
+    }
+
+    .chat-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-container::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.05);
+      border-radius: 3px;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.2);
+      border-radius: 3px;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 1rem 1.25rem;
+      border-radius: 18px;
+      line-height: 1.5;
+      position: relative;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .message.user {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .message.bot {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      color: #2c3e50;
+      align-self: flex-start;
+      border-bottom-left-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .message.loading {
+      background: #f8f9fa;
+      color: #6c757d;
+      align-self: flex-start;
+      border-bottom-left-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #6c757d;
+      animation: typing 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    .weather-card {
+      background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: 16px;
+      margin-top: 0.5rem;
+      box-shadow: 0 8px 25px rgba(116, 185, 255, 0.3);
+    }
+
+    .weather-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .weather-icon {
+      font-size: 2.5rem;
+    }
+
+    .weather-temp {
+      font-size: 2rem;
+      font-weight: 600;
+    }
+
+    .weather-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .weather-detail {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .input-container {
+      padding: 1.5rem;
+      background: rgba(248, 249, 250, 0.5);
+      border-top: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .input-form {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    .user-input {
+      width: 100%;
+      padding: 1rem 1.25rem;
+      border: 2px solid rgba(0,0,0,0.08);
+      border-radius: 16px;
+      font-size: 1rem;
+      font-family: inherit;
+      background: white;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .user-input:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .user-input::placeholder {
+      color: #adb5bd;
+    }
+
+    .submit-btn {
+      padding: 1rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 52px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .welcome-message {
+      text-align: center;
+      color: #6c757d;
+      font-style: italic;
+      opacity: 0.8;
+      padding: 2rem 1rem;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes typing {
+      0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        margin: 0.5rem;
+        border-radius: 20px;
+      }
+      
+      .header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .weather-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div class="chat-container">
-    <header>🌤️ WeatherBot by Gemini</header>
-    <div id="chat-box" class="chat-box"></div>
-    <form id="chat-form">
-      <input type="text" id="user-input" placeholder="Enter your city or say hi..." autocomplete="off" required />
-      <button type="submit">➤</button>
-    </form>
+  <div class="container">
+    <div class="header">
+      <h1><i class="fas fa-cloud-sun"></i> WeatherBot AI</h1>
+      <p>Ask me about weather in natural language</p>
+    </div>
+    
+    <div class="chat-container" id="chatContainer">
+      <div class="welcome-message">
+        <i class="fas fa-robot"></i><br>
+        Hi! I'm your weather assistant. Ask me things like:<br>
+        "What's the weather in Tokyo?" or "Is it raining in London?"
+      </div>
+    </div>
+    
+    <div class="input-container">
+      <form class="input-form" id="inputForm">
+        <div class="input-wrapper">
+          <input 
+            type="text" 
+            class="user-input" 
+            id="userInput" 
+            placeholder="Ask me about weather anywhere..." 
+            required 
+          />
+        </div>
+        <button type="submit" class="submit-btn" id="submitBtn">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </form>
+    </div>
   </div>
 
-  <script type="module" src="script.js"></script>
+  <script>
+    const chatContainer = document.getElementById('chatContainer');
+    const inputForm = document.getElementById('inputForm');
+    const userInput = document.getElementById('userInput');
+    const submitBtn = document.getElementById('submitBtn');
+
+    const WEATHER_API_KEY = '57d1da3aa001e576f4e5fb9daca612c7';
+
+    function addMessage(content, sender = 'user', isWeatherCard = false) {
+      // Remove welcome message if it exists
+      const welcomeMsg = chatContainer.querySelector('.welcome-message');
+      if (welcomeMsg) {
+        welcomeMsg.remove();
+      }
+
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${sender}`;
+      
+      if (isWeatherCard && typeof content === 'object') {
+        messageDiv.innerHTML = createWeatherCard(content);
+      } else {
+        messageDiv.textContent = content;
+      }
+      
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return messageDiv;
+    }
+
+    function addLoadingMessage() {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message loading';
+      messageDiv.innerHTML = `
+        <i class="fas fa-robot"></i>
+        <span>Analyzing your request</span>
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      `;
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      return messageDiv;
+    }
+
+    function createWeatherCard(data) {
+      const iconMap = {
+        'clear sky': 'fas fa-sun',
+        'few clouds': 'fas fa-cloud-sun',
+        'scattered clouds': 'fas fa-cloud',
+        'broken clouds': 'fas fa-cloud',
+        'overcast clouds': 'fas fa-cloud',
+        'shower rain': 'fas fa-cloud-rain',
+        'rain': 'fas fa-cloud-rain',
+        'light rain': 'fas fa-cloud-rain',
+        'moderate rain': 'fas fa-cloud-rain',
+        'heavy rain': 'fas fa-cloud-showers-heavy',
+        'thunderstorm': 'fas fa-bolt',
+        'snow': 'fas fa-snowflake',
+        'mist': 'fas fa-smog',
+        'fog': 'fas fa-smog'
+      };
+
+      const weatherIcon = iconMap[data.description.toLowerCase()] || 'fas fa-cloud';
+
+      return `
+        <div class="weather-card">
+          <div class="weather-header">
+            <div>
+              <h3 style="margin: 0; font-size: 1.2rem;">${data.city}</h3>
+              <p style="margin: 0; opacity: 0.9; text-transform: capitalize;">${data.description}</p>
+            </div>
+            <div style="text-align: right;">
+              <i class="${weatherIcon} weather-icon"></i>
+              <div class="weather-temp">${Math.round(data.temp)}°C</div>
+            </div>
+          </div>
+          <div class="weather-details">
+            <div class="weather-detail">
+              <i class="fas fa-thermometer-half"></i>
+              <span>Feels like ${Math.round(data.feels_like)}°C</span>
+            </div>
+            <div class="weather-detail">
+              <i class="fas fa-tint"></i>
+              <span>Humidity ${data.humidity}%</span>
+            </div>
+            <div class="weather-detail">
+              <i class="fas fa-wind"></i>
+              <span>Wind ${data.wind_speed} m/s</span>
+            </div>
+            <div class="weather-detail">
+              <i class="fas fa-eye"></i>
+              <span>Visibility ${(data.visibility / 1000).toFixed(1)} km</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function extractCityFromQuery(query) {
+      // Enhanced natural language processing to extract city names
+      const cityPatterns = [
+        // Direct patterns
+        /(?:weather (?:in|for|at) )([a-zA-Z\s,.-]+?)(?:\?|$|,)/i,
+        /(?:(?:what'?s|how'?s) (?:the )?weather (?:in|at|for) )([a-zA-Z\s,.-]+?)(?:\?|$|,)/i,
+        /(?:is it (?:raining|snowing|sunny|cloudy) (?:in|at) )([a-zA-Z\s,.-]+?)(?:\?|$|,)/i,
+        /(?:temperature (?:in|at|for) )([a-zA-Z\s,.-]+?)(?:\?|$|,)/i,
+        /(?:forecast (?:for|in|at) )([a-zA-Z\s,.-]+?)(?:\?|$|,)/i,
+        
+        // More flexible patterns
+        /(?:in )([a-zA-Z\s,.-]+?)(?:\?|$| today| tomorrow| now)/i,
+        /(?:at )([a-zA-Z\s,.-]+?)(?:\?|$| today| tomorrow| now)/i,
+        /(?:for )([a-zA-Z\s,.-]+?)(?:\?|$| today| tomorrow| now)/i,
+        
+        // City name at the end
+        /(?:weather|temperature|forecast|raining|snowing|sunny|cloudy).+?([a-zA-Z\s,.-]+?)(?:\?|$)/i,
+        
+        // Just the city name (as fallback)
+        /^([a-zA-Z\s,.-]+?)(?:\?|$)/i
+      ];
+
+      for (const pattern of cityPatterns) {
+        const match = query.match(pattern);
+        if (match && match[1]) {
+          let city = match[1].trim();
+          
+          // Clean up the extracted city name
+          city = city.replace(/\b(weather|temperature|forecast|today|tomorrow|now|please|thanks?|thank you)\b/gi, '');
+          city = city.replace(/\s+/g, ' ').trim();
+          city = city.replace(/[,.-]+$/, ''); // Remove trailing punctuation
+          
+          if (city.length > 1 && city.length < 100) {
+            return city;
+          }
+        }
+      }
+
+      // If no pattern matches, try to find any word that looks like a city
+      const words = query.replace(/[^\w\s]/g, '').split(/\s+/);
+      const stopWords = ['weather', 'what', 'is', 'the', 'in', 'at', 'for', 'how', 'today', 'tomorrow', 'now', 'like', 'there', 'it', 'raining', 'snowing', 'sunny', 'cloudy', 'temperature', 'forecast'];
+      
+      for (const word of words) {
+        if (word.length > 2 && !stopWords.includes(word.toLowerCase())) {
+          return word;
+        }
+      }
+
+      return null;
+    }
+
+    // Common typos and alternate spellings for major cities
+    const cityCorrections = {
+      'tokio': 'tokyo',
+      'tokoy': 'tokyo',
+      'tokoyo': 'tokyo',
+      'londn': 'london',
+      'londen': 'london',
+      'lonon': 'london',
+      'newyork': 'new york',
+      'ny': 'new york',
+      'nyc': 'new york',
+      'new yourk': 'new york',
+      'new yrok': 'new york',
+      'paris': 'paris',
+      'parise': 'paris',
+      'pariis': 'paris',
+      'berln': 'berlin',
+      'belin': 'berlin',
+      'berling': 'berlin',
+      'moscow': 'moscow',
+      'moscw': 'moscow',
+      'mosco': 'moscow',
+      'sydney': 'sydney',
+      'sidny': 'sydney',
+      'sidnye': 'sydney',
+      'melbourn': 'melbourne',
+      'melborne': 'melbourne',
+      'mumbay': 'mumbai',
+      'bombay': 'mumbai',
+      'delhi': 'delhi',
+      'deli': 'delhi',
+      'bangalor': 'bangalore',
+      'bangalure': 'bangalore',
+      'chenai': 'chennai',
+      'madras': 'chennai',
+      'singapor': 'singapore',
+      'singapur': 'singapore',
+      'seol': 'seoul',
+      'seuol': 'seoul',
+      'bejing': 'beijing',
+      'peking': 'beijing',
+      'shangai': 'shanghai',
+      'shanhai': 'shanghai',
+      'honkong': 'hong kong',
+      'hongkong': 'hong kong',
+      'doha': 'doha',
+      'dubai': 'dubai',
+      'dubay': 'dubai',
+      'riyadh': 'riyadh',
+      'riyad': 'riyadh',
+      'tehran': 'tehran',
+      'teheran': 'tehran',
+      'instanbul': 'istanbul',
+      'istanbull': 'istanbul',
+      'athns': 'athens',
+      'athen': 'athens',
+      'rome': 'rome',
+      'roma': 'rome',
+      'milan': 'milan',
+      'milano': 'milan',
+      'barcelona': 'barcelona',
+      'barselona': 'barcelona',
+      'madrid': 'madrid',
+      'madrd': 'madrid',
+      'lisbon': 'lisbon',
+      'lisboa': 'lisbon',
+      'amsterdm': 'amsterdam',
+      'amesterdam': 'amsterdam',
+      'brussls': 'brussels',
+      'brussel': 'brussels',
+      'vienna': 'vienna',
+      'wien': 'vienna',
+      'zurich': 'zurich',
+      'zurik': 'zurich',
+      'losangeles': 'los angeles',
+      'la': 'los angeles',
+      'sanfrancisco': 'san francisco',
+      'sf': 'san francisco',
+      'chicago': 'chicago',
+      'chicgo': 'chicago',
+      'miami': 'miami',
+      'miamy': 'miami',
+      'lasvegas': 'las vegas',
+      'vegas': 'las vegas',
+      'washingtondc': 'washington',
+      'washingtn': 'washington',
+      'boston': 'boston',
+      'bostn': 'boston',
+      'seattle': 'seattle',
+      'seatle': 'seattle',
+      'toronto': 'toronto',
+      'toranto': 'toronto',
+      'vancouver': 'vancouver',
+      'vancuver': 'vancouver',
+      'montreal': 'montreal',
+      'montral': 'montreal',
+      'mexcocity': 'mexico city',
+      'mexicocity': 'mexico city',
+      'riodejaneiro': 'rio de janeiro',
+      'rio': 'rio de janeiro',
+      'saopaulo': 'sao paulo',
+      'buenosaires': 'buenos aires',
+      'lima': 'lima',
+      'bogota': 'bogota',
+      'caracas': 'caracas',
+      'santiago': 'santiago',
+      'capetown': 'cape town',
+      'johannesburg': 'johannesburg',
+      'cairo': 'cairo',
+      'casablanca': 'casablanca',
+      'lagos': 'lagos',
+      'nairobi': 'nairobi',
+      'addisababa': 'addis ababa'
+    };
+
+    function correctCitySpelling(city) {
+      const normalizedCity = city.toLowerCase().trim();
+      
+      // Check direct corrections first
+      if (cityCorrections[normalizedCity]) {
+        return cityCorrections[normalizedCity];
+      }
+      
+      // Check for partial matches and common patterns
+      for (const [typo, correct] of Object.entries(cityCorrections)) {
+        if (levenshteinDistance(normalizedCity, typo) <= 2 && normalizedCity.length > 3) {
+          return correct;
+        }
+      }
+      
+      return city; // Return original if no correction found
+    }
+
+    function levenshteinDistance(str1, str2) {
+      const matrix = [];
+      const len1 = str1.length;
+      const len2 = str2.length;
+
+      if (len1 === 0) return len2;
+      if (len2 === 0) return len1;
+
+      // Initialize matrix
+      for (let i = 0; i <= len2; i++) {
+        matrix[i] = [i];
+      }
+      for (let j = 0; j <= len1; j++) {
+        matrix[0][j] = j;
+      }
+
+      // Fill matrix
+      for (let i = 1; i <= len2; i++) {
+        for (let j = 1; j <= len1; j++) {
+          if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+            matrix[i][j] = matrix[i - 1][j - 1];
+          } else {
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j - 1] + 1, // substitution
+              matrix[i][j - 1] + 1,     // insertion
+              matrix[i - 1][j] + 1      // deletion
+            );
+          }
+        }
+      }
+
+      return matrix[len2][len1];
+    }
+
+    async function getWeatherData(city) {
+      // First, try to correct common typos
+      const correctedCity = correctCitySpelling(city);
+      
+      const tryCity = async (cityName, isOriginal = true) => {
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${WEATHER_API_KEY}&units=metric`;
+        
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Not found: ${cityName}`);
+          }
+
+          const data = await response.json();
+          return {
+            city: data.name + (data.sys.country ? `, ${data.sys.country}` : ''),
+            temp: data.main.temp,
+            feels_like: data.main.feels_like,
+            description: data.weather[0].description,
+            humidity: data.main.humidity,
+            wind_speed: data.wind.speed,
+            visibility: data.visibility || 10000,
+            corrected: !isOriginal ? correctedCity : null
+          };
+        } catch (error) {
+          throw error;
+        }
+      };
+
+      try {
+        // Try original city name first
+        return await tryCity(city, true);
+      } catch (originalError) {
+        if (correctedCity !== city.toLowerCase()) {
+          try {
+            // Try corrected spelling
+            const result = await tryCity(correctedCity, false);
+            return result;
+          } catch (correctedError) {
+            // If correction also fails, try some common variations
+            const variations = generateCityVariations(city);
+            for (const variation of variations) {
+              try {
+                const result = await tryCity(variation, false);
+                result.corrected = variation;
+                return result;
+              } catch (variationError) {
+                continue;
+              }
+            }
+          }
+        }
+        
+        // If all attempts fail, throw a helpful error
+        throw new Error(`I couldn't find weather information for "${city}". ${correctedCity !== city.toLowerCase() ? `I tried "${correctedCity}" as well. ` : ''}Please check the spelling and try again.`);
+      }
+    }
+
+    function generateCityVariations(city) {
+      const variations = [];
+      const cleaned = city.toLowerCase().trim();
+      
+      // Remove common suffixes that might be typed incorrectly
+      const suffixVariations = [
+        cleaned.replace(/city$/, ''),
+        cleaned.replace(/ton$/, 'ton'),
+        cleaned.replace(/burg$/, 'berg'),
+        cleaned.replace(/berg$/, 'burg')
+      ];
+      
+      // Add variations with/without spaces
+      variations.push(cleaned.replace(/\s+/g, ''));
+      variations.push(cleaned.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
+      
+      // Common letter substitutions
+      const substitutions = [
+        [/ph/g, 'f'],
+        [/f/g, 'ph'],
+        [/c/g, 'k'],
+        [/k/g, 'c'],
+        [/y/g, 'i'],
+        [/i/g, 'y'],
+        [/ou/g, 'o'],
+        [/o/g, 'ou']
+      ];
+      
+      for (const [from, to] of substitutions) {
+        if (from.test(cleaned)) {
+          variations.push(cleaned.replace(from, to));
+        }
+      }
+      
+      return [...new Set([...variations, ...suffixVariations])].filter(v => v && v !== cleaned);
+    }
+
+    function generateNaturalResponse(weatherData, originalQuery) {
+      const responses = [
+        `Here's the current weather in ${weatherData.city}:`,
+        `I found the weather information for ${weatherData.city}:`,
+        `Current conditions in ${weatherData.city}:`,
+        `Weather update for ${weatherData.city}:`
+      ];
+      
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    async function handleUserMessage(query) {
+      const loadingMsg = addLoadingMessage();
+      
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
+        
+        const city = await extractCityFromQuery(query);
+        
+        if (!city) {
+          loadingMsg.remove();
+          addMessage("I couldn't identify a city in your message. Could you please specify which city you'd like weather information for?", 'bot');
+          return;
+        }
+
+        loadingMsg.textContent = `Looking up weather for ${city}...`;
+        
+                 const weatherData = await getWeatherData(city);
+         loadingMsg.remove();
+         
+         // If we corrected a typo, let the user know
+         if (weatherData.corrected) {
+           addMessage(`I found weather for "${weatherData.city}" (I think you meant "${weatherData.corrected}" instead of "${city}").`, 'bot');
+         } else {
+           const response = generateNaturalResponse(weatherData, query);
+           addMessage(response, 'bot');
+         }
+         addMessage(weatherData, 'bot', true);
+        
+      } catch (error) {
+        loadingMsg.remove();
+        addMessage(error.message, 'bot');
+      }
+    }
+
+    inputForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const query = userInput.value.trim();
+      if (!query) return;
+      
+      // Disable form during processing
+      submitBtn.disabled = true;
+      userInput.disabled = true;
+      
+      addMessage(query, 'user');
+      userInput.value = '';
+      
+      await handleUserMessage(query);
+      
+      // Re-enable form
+      submitBtn.disabled = false;
+      userInput.disabled = false;
+      userInput.focus();
+    });
+
+    // Focus input on load
+    userInput.focus();
+  </script>
 </body>
 </html>
